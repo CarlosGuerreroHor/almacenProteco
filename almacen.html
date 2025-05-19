@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Almacen proteco</title>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <style>
+        #fechaImpresion {
+            display: none;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+
+        #app {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        label {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        input[type="text"],
+        input[type="number"] {
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            width: 100%;
+        }
+
+        button {
+            padding: 10px;
+            font-size: 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        th,
+        td {
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+
+        th {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+
+
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+
+        .sorting-icon {
+            margin-left: 5px;
+            font-size: 12px;
+        }
+
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+
+            #tablaArticulos,
+            #tablaArticulos * {
+                visibility: visible;
+            }
+
+            #tablaArticulos {
+                width: 100%;
+                border: 1px solid #000;
+                border-collapse: collapse;
+            }
+
+            th,
+            td {
+                font-size: 12px;
+                padding: 8px;
+                text-align: center;
+            }
+
+
+
+            /* Ajustar el ancho de la tabla a un tamaño A4 */
+            @page {
+                size: A4;
+                margin: 20mm;
+            }
+
+            /* Limitar la cantidad de filas (hasta 20) */
+            tbody {
+                max-height: 300mm;
+            }
+
+            tr {
+                page-break-inside: avoid;
+            }
+
+            /* Fecha en la impresión */
+            #fechaImpresion {
+                display: block;
+                text-align: center;
+                margin-top: 20px;
+                font-size: 12px;
+            }
+
+            /* Aseguramos que los datos de la tabla se alineen con los encabezados */
+            th,
+            td {
+                width: 33%;
+            }
+
+            /* Evitar corte de filas en la impresión */
+            tr {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+
+<body>
+    <div id="app">
+
+
+        <h2>Lista de Artículos</h2>
+        <table id="tablaArticulos">
+            <thead>
+                <tr>
+                    <th id="nombre-header">Nombre <span class="sorting-icon">▼</span></th>
+                    <th id="talla-header">Talla</th>
+                    <th id="cantidad-header">Cantidad</th>
+                    <th>eliminar</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Los artículos se insertarán aquí -->
+            </tbody>
+        </table>
+
+        <form id="creaArticulo">
+            <div>
+                <label for="nombre">Nombre del artículo:</label>
+                <input type="text" id="nombre" placeholder="Introduce el nombre del artículo" required>
+            </div>
+            <div>
+                <label>
+                    <input type="checkbox" id="usaTallas">
+                    ¿Requiere tallas?
+                </label>
+            </div>
+            <button type="submit" id="buttonArticulo">Nuevo artículo</button>
+        </form>
+
+        <button id="imprimir" onclick="window.print()">Imprimir Tabla</button>
+        <div id="fechaImpresion" class="hidden"></div>
+    </div>
+
+
+
+    <script src="https://www.gstatic.com/firebasejs/11.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore-compat.js"></script>
+
+
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDoc, getDocs, collection, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
+        // TODO: Add SDKs for Firebase products that you want to use
+        // https://firebase.google.com/docs/web/setup#available-libraries
+
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCUUMyDkcliuJbMuWAFocDeOnLRLXpCGQo",
+            authDomain: "protecoronda.firebaseapp.com",
+            projectId: "protecoronda",
+            storageBucket: "protecoronda.firebasestorage.app",
+            messagingSenderId: "613144635735",
+            appId: "1:613144635735:web:4a3de49b74b858529cf612"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        //------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+        //mi code
+
+        let articulos = [];
+        const tallaOrden = {
+            "XXXS": 1,
+            "XXS": 2,
+            "XS": 3,
+            "S": 4,
+            "M": 5,
+            "L": 6,
+            "XL": 7,
+            "XXL": 8,
+            "XXXL": 9
+        };
+
+        const fechaImpresion = new Date().toLocaleDateString();
+        document.getElementById('fechaImpresion').textContent = "Fecha de impresión: " + fechaImpresion;
+
+
+
+        function imprimirPagina() {
+            window.print();
+        }
+
+        async function nuevoArticulo(event) {
+            event.preventDefault();
+
+            const nombre = document.getElementById('nombre').value.trim();
+            const usaTallas = document.getElementById('usaTallas').checked;
+
+            if (nombre) {
+                let datosArticulo = { nombre };
+
+                if (usaTallas) {
+                    const tallas = ["XXXS", "XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL"];
+                    tallas.forEach(t => datosArticulo[t] = 0);
+                } else {
+                    datosArticulo.cantidad = 0;
+                }
+
+                try {
+                    await setDoc(doc(db, "Articulos", nombre), datosArticulo);
+                    document.getElementById('creaArticulo').reset();
+                    cargarArticulos();
+                } catch (error) {
+                    console.error("Error al agregar el artículo: ", error);
+                }
+            } else {
+                alert("Por favor, llena el nombre del artículo.");
+            }
+        }
+
+        async function cargarArticulos() {
+            try {
+                const querySnapshot = await getDocs(collection(db, "Articulos"));
+                articulos = [];
+
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    articulos.push(data);
+                });
+
+                mostrarArticulos(articulos);
+            } catch (error) {
+                console.error("Error al cargar los artículos: ", error);
+            }
+        }
+
+        async function guardarCantidad(input, articulo, cell) {
+            const cantidad = parseInt(input.value);
+            if (!isNaN(cantidad)) {
+                try {
+                    await updateDoc(doc(db, "Articulos", articulo.nombre), { cantidad });
+                    cell.textContent = cantidad;
+                } catch (error) {
+                    console.error("Error al actualizar la cantidad: ", error);
+                }
+            } else {
+                cell.textContent = articulo.cantidad;
+            }
+        }
+
+
+        function mostrarArticulos(articulos) {
+            const tablaBody = document.getElementById('tablaArticulos').getElementsByTagName('tbody')[0];
+            tablaBody.innerHTML = '';
+
+            articulos.forEach((articulo) => {
+                const fila = tablaBody.insertRow();
+                fila.insertCell(0).textContent = articulo.nombre;
+
+                const esConTallas = Object.keys(articulo).some(k => ["XXXS", "XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL"].includes(k));
+
+                const tallaCell = fila.insertCell(1);
+                const cantidadCell = fila.insertCell(2);
+                const accionCell = fila.insertCell(3);
+
+                // Botón Eliminar
+                const btnEliminar = document.createElement("button");
+                btnEliminar.textContent = "Eliminar";
+                btnEliminar.style.backgroundColor = "red";
+                btnEliminar.style.color = "white";
+                btnEliminar.style.border = "none";
+                btnEliminar.style.padding = "5px 10px";
+                btnEliminar.style.borderRadius = "5px";
+                btnEliminar.style.cursor = "pointer";
+                btnEliminar.addEventListener("click", () => eliminarArticulo(articulo.nombre));
+
+                accionCell.appendChild(btnEliminar);
+
+                if (esConTallas) {
+                    tallaCell.innerHTML = '<button class="toggle-tallas">Ver tallas</button>';
+
+                    const detalleRow = tablaBody.insertRow();
+                    detalleRow.style.display = "none";
+
+                    const detalleCell = detalleRow.insertCell(0);
+                    detalleCell.colSpan = 4;
+
+                    const subtabla = document.createElement("table");
+                    subtabla.style.width = "100%";
+
+                    const tallas = ["XXXS", "XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL"];
+                    tallas.forEach(talla => {
+                        const subRow = subtabla.insertRow();
+                        const celdaTalla = subRow.insertCell(0);
+                        celdaTalla.textContent = talla;
+                        const celdaValor = subRow.insertCell(1);
+                        celdaValor.textContent = articulo[talla] || 0;
+                        celdaValor.addEventListener("dblclick", () => editarValorTalla(celdaValor, articulo, talla));
+                    });
+
+                    detalleCell.appendChild(subtabla);
+
+                    tallaCell.querySelector("button").addEventListener("click", () => {
+                        detalleRow.style.display = detalleRow.style.display === "none" ? "table-row" : "none";
+                    });
+
+                    cantidadCell.textContent = "-";
+                } else {
+                    tallaCell.textContent = "No";
+                    cantidadCell.textContent = articulo.cantidad;
+                    cantidadCell.addEventListener("dblclick", () => editarCantidad(cantidadCell, articulo));
+                }
+            });
+        }
+
+        async function eliminarArticulo(nombre) {
+            const confirmado = confirm(`¿Estás seguro de que deseas eliminar el artículo "${nombre}"?`);
+            if (!confirmado) return;
+
+            try {
+                await deleteDoc(doc(db, "Articulos", nombre));
+                alert(`"${nombre}" ha sido eliminado correctamente.`);
+                cargarArticulos();
+            } catch (error) {
+                console.error("Error al eliminar el artículo: ", error);
+                alert("Error al eliminar el artículo.");
+            }
+        }
+
+        function editarValorTalla(cell, articulo, talla) {
+            const input = document.createElement("input");
+            input.type = "number";
+            input.value = cell.textContent;
+            input.addEventListener("blur", async () => {
+                const nuevoValor = parseInt(input.value);
+                if (!isNaN(nuevoValor)) {
+                    try {
+                        await updateDoc(doc(db, "Articulos", articulo.nombre), {
+                            [talla]: nuevoValor
+                        });
+                        cell.textContent = nuevoValor;
+                    } catch (error) {
+                        console.error("Error al actualizar talla:", error);
+                    }
+                } else {
+                    cell.textContent = articulo[talla];
+                }
+            });
+            input.addEventListener("keydown", e => {
+                if (e.key === "Enter") input.blur();
+            });
+
+            cell.innerHTML = '';
+            cell.appendChild(input);
+            input.focus();
+        }
+
+        function editarCantidad(cell, articulo) {
+            const input = document.createElement("input");
+            input.type = "number";
+            input.value = cell.textContent;
+            input.addEventListener("blur", () => guardarCantidad(input, articulo, cell));
+            input.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") {
+                    input.blur();
+                }
+            });
+            cell.innerHTML = '';
+            cell.appendChild(input);
+            input.focus();
+        }
+
+        function ordenarPorCampo(campo, tipo) {
+            if (campo === 'nombre' || campo === 'talla') {
+                articulos.sort((a, b) => {
+                    let valA = a[campo];
+                    let valB = b[campo];
+
+                    // Si es la talla, ordenamos usando el mapa tallaOrden
+                    if (campo === 'talla') {
+                        valA = tallaOrden[valA] || Infinity;
+                        valB = tallaOrden[valB] || Infinity;
+                    }
+
+                    // Orden alfabético para 'nombre' o 'talla'
+                    if (tipo === 'asc') return valA < valB ? -1 : 1;
+                    return valA > valB ? -1 : 1;
+                });
+            } else if (campo === 'cantidad') {
+                articulos.sort((a, b) => {
+                    if (tipo === 'asc') return a[campo] - b[campo];
+                    return b[campo] - a[campo];
+                });
+            }
+            mostrarArticulos(articulos);
+        }
+
+        function cambiarIconoOrdenacion(campo) {
+            const iconos = document.querySelectorAll('.sorting-icon');
+            iconos.forEach(icon => icon.textContent = '▼');
+            const columna = document.getElementById(`${campo}-header`);
+            const icono = columna.querySelector('.sorting-icon');
+            icono.textContent = icono.textContent === '▼' ? '▲' : '▼';
+        }
+
+        document.getElementById('creaArticulo').addEventListener("submit", nuevoArticulo);
+        document.getElementById('nombre-header').addEventListener("click", () => {
+            const tipo = document.querySelector('#nombre-header .sorting-icon').textContent === '▼' ? 'asc' : 'desc';
+            ordenarPorCampo('nombre', tipo);
+            cambiarIconoOrdenacion('nombre');
+        });
+        document.getElementById('talla-header').addEventListener("click", () => {
+            const tipo = document.querySelector('#talla-header .sorting-icon').textContent === '▼' ? 'asc' : 'desc';
+            ordenarPorCampo('talla', tipo);
+            cambiarIconoOrdenacion('talla');
+        });
+        document.getElementById('cantidad-header').addEventListener("click", () => {
+            const tipo = document.querySelector('#cantidad-header .sorting-icon').textContent === '▼' ? 'asc' : 'desc';
+            ordenarPorCampo('cantidad', tipo);
+            cambiarIconoOrdenacion('cantidad');
+        });
+
+        cargarArticulos();
+    </script>
+
+
+</body>
+
+</html>
